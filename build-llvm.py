@@ -16,8 +16,7 @@ import urllib.request as request
 from urllib.error import URLError
 
 # This is a known good revision of LLVM for building the kernel
-# To bump this, run 'PATH_OVERRIDE=<path_to_updated_toolchain>/bin kernel/build.sh --allyesconfig'
-GOOD_REVISION = '09ac3523b6729c9300e044081c442c304602cfd9'
+GOOD_REVISION = '4b1fde8a2b681dad2ce0c082a5d6422caa06b0bc'
 
 
 class Directories:
@@ -896,7 +895,7 @@ def get_targets(args):
     elif args.full_toolchain:
         targets = "all"
     else:
-        targets = "AArch64;ARM;BPF;Mips;PowerPC;RISCV;SystemZ;X86"
+        targets = "AArch64;ARM;BPF;Hexagon;Mips;PowerPC;RISCV;SystemZ;X86"
 
     return targets
 

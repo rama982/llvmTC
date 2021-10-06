@@ -42,6 +42,7 @@ function parse_parameters() {
                     case ${LLVM_TARGET} in
                         "AArch64") TARGETS+=("aarch64-linux-gnu") ;;
                         "ARM") TARGETS+=("arm-linux-gnueabi") ;;
+                        "Hexagon") TARGETS+=("hexagon-linux-gnu") ;;
                         "Mips") TARGETS+=("mipsel-linux-gnu") ;;
                         "PowerPC") TARGETS+=("powerpc-linux-gnu" "powerpc64-linux-gnu" "powerpc64le-linux-gnu") ;;
                         "RISCV") TARGETS+=("riscv64-linux-gnu") ;;
@@ -59,6 +60,7 @@ function set_default_values() {
     [[ -z ${TARGETS[*]} || ${TARGETS[*]} = "all" ]] && TARGETS=(
         "arm-linux-gnueabi"
         "aarch64-linux-gnu"
+        "hexagon-linux-gnu"
         "mipsel-linux-gnu"
         "powerpc-linux-gnu"
         "powerpc64-linux-gnu"
@@ -98,7 +100,7 @@ function setup_krnl_src() {
     if [[ -n ${KERNEL_SRC} ]]; then
         cd "${KERNEL_SRC}" || exit 1
     else
-        LINUX=linux-5.12.9
+        LINUX=linux-5.14
         LINUX_TARBALL=${KRNL}/${LINUX}.tar.xz
 
         # If we don't have the source tarball, download and verify it
@@ -119,7 +121,7 @@ function setup_krnl_src() {
         for SRC_FILE in "${KRNL}"/*; do
             [[ ${SRC_FILE##*/} = *.patch ]] && PATCH_FILES+=("${SRC_FILE}")
         done
-        [[ -n "${PATCHES[*]}" ]] && rm -rf ${LINUX}
+        [[ -n "${PATCH_FILES[*]}" ]] && rm -rf ${LINUX}
         [[ -d ${LINUX} ]] || { tar -xf "${LINUX_TARBALL}" || exit ${?}; }
         cd ${LINUX} || exit 1
         for PATCH_FILE in "${PATCH_FILES[@]}"; do
@@ -132,6 +134,8 @@ function check_binutils() {
     # Check for all binutils and build them if necessary
     BINUTILS_TARGETS=()
     for PREFIX in "${TARGETS[@]}"; do
+        # Hexagon does not build binutils
+        [[ ${PREFIX} = "hexagon-linux-gnu" ]] && continue
         # We assume an x86_64 host, should probably make this more generic in the future
         if [[ ${PREFIX} = "x86_64-linux-gnu" ]]; then
             COMMAND=as
@@ -151,6 +155,7 @@ function print_tc_info() {
         echo
         case ${PREFIX} in
             x86_64-linux-gnu) as --version ;;
+            hexagon-linux-gnu) ;;
             *) "${PREFIX}"-as --version ;;
         esac
     done
@@ -163,6 +168,7 @@ function build_kernels() {
     case "$(uname -m)" in
         arm*) [[ ${TARGETS[*]} =~ arm ]] || NEED_GCC=true ;;
         aarch64) [[ ${TARGETS[*]} =~ aarch64 ]] || NEED_GCC=true ;;
+        hexagon) [[ ${TARGETS[*]} =~ hexagon ]] || NEED_GCC=true ;;
         mips*) [[ ${TARGETS[*]} =~ mips ]] || NEED_GCC=true ;;
         ppc*) [[ ${TARGETS[*]} =~ powerpc ]] || NEED_GCC=true ;;
         s390*) [[ ${TARGETS[*]} =~ s390 ]] || NEED_GCC=true ;;
@@ -191,8 +197,7 @@ function build_kernels() {
                         ;;
                 esac
                 for CONFIG in "${CONFIGS[@]}"; do
-                    time \
-                        "${MAKE[@]}" \
+                    time "${MAKE[@]}" \
                         ARCH=arm \
                         CROSS_COMPILE="${TARGET}-" \
                         KCONFIG_ALLCONFIG=<(echo CONFIG_CPU_BIG_ENDIAN=n) \
@@ -200,38 +205,40 @@ function build_kernels() {
                 done
                 ;;
             "aarch64-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     ARCH=arm64 \
                     CROSS_COMPILE="${TARGET}-" \
                     KCONFIG_ALLCONFIG=<(echo CONFIG_CPU_BIG_ENDIAN=n) \
                     distclean "${CONFIG_TARGET}" all || exit ${?}
                 ;;
+            "hexagon-linux-gnu")
+                time "${MAKE[@]}" \
+                    ARCH=hexagon \
+                    CROSS_COMPILE="${TARGET}-" \
+                    LLVM_IAS=1 \
+                    distclean defconfig all || exit ${?}
+                ;;
             "mipsel-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     ARCH=mips \
                     CROSS_COMPILE="${TARGET}-" \
                     distclean malta_defconfig all || exit ${?}
                 ;;
             "powerpc-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     ARCH=powerpc \
                     CROSS_COMPILE="${TARGET}-" \
                     distclean ppc44x_defconfig all || exit ${?}
                 ;;
             "powerpc64-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     ARCH=powerpc \
                     LD="${TARGET}-ld" \
                     CROSS_COMPILE="${TARGET}-" \
                     distclean pseries_defconfig disable-werror.config all || exit ${?}
                 ;;
             "powerpc64le-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     ARCH=powerpc \
                     CROSS_COMPILE="${TARGET}-" \
                     distclean powernv_defconfig all || exit ${?}
@@ -250,8 +257,7 @@ function build_kernels() {
                 time "${RISCV_MAKE[@]}" all || exit ${?}
                 ;;
             "s390x-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     ARCH=s390 \
                     CROSS_COMPILE="${TARGET}-" \
                     LD="${TARGET}-ld" \
@@ -260,8 +266,7 @@ function build_kernels() {
                     distclean defconfig all || exit ${?}
                 ;;
             "x86_64-linux-gnu")
-                time \
-                    "${MAKE[@]}" \
+                time "${MAKE[@]}" \
                     distclean "${CONFIG_TARGET}" all || exit ${?}
                 ;;
         esac
