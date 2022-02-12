@@ -8,6 +8,7 @@
 # GH_EMAIL | Your Github Email
 # GH_TOKEN | Your Github Token ( repo & repo_hook )
 # GH_PUSH_REPO_URL | Your Repository for store compiled Toolchain ( without https:// or www. ) ex. github.com/xyz-prjkt/xRageTC.git
+# GH_SCRIPT_REPO_URL | Your Repository contain script to build Toolchain ( without https:// or www. ) ex. github.com/xyz-prjkt/xRageTC.git
 
 # Function to show an informational message
 msg() {
@@ -118,7 +119,7 @@ git commit -asm "$LLVM_NAME: Bump to $rel_date build
 LLVM commit: $llvm_commit_url
 Clang Version: $clang_version
 Binutils version: $binutils_ver
-Builder commit: https://$GH_PUSH_REPO_URL/commit/$builder_commit"
+Builder commit: https://$GH_SCRIPT_REPO_URL/commit/$builder_commit"
 git push -f
 popd || exit
 tg_post_msg "<b>$LLVM_NAME: Toolchain pushed to <code>https://$GH_PUSH_REPO_URL</code></b>"
